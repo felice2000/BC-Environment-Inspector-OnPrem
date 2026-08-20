@@ -6,7 +6,7 @@
 
 # VS Code local configuration
 .vscode/launch.json
-
+.vscode/rad.json
 # Snapshots / temp
 .snapshots/
 
