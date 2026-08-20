@@ -1,4 +1,4 @@
-page 50200 "Environment Inspector"
+page 90200 "Environment Inspector"
 {
     PageType = Card;
     Caption = 'Environment Inspector';
@@ -159,9 +159,53 @@ page 50200 "Environment Inspector"
                 field(SqlDatabaseName; SqlDatabaseName)
                 {
                     ApplicationArea = All;
-                    Caption = 'Connected Database';
+                    Caption = 'Database';
                     Editable = false;
                 }
+            }
+        }
+    }
+
+    actions
+    {
+        area(Processing)
+        {
+            action(RefreshInformation)
+            {
+                ApplicationArea = All;
+                Caption = 'Refresh';
+                ToolTip = 'Refreshes all environment information.';
+                Image = Refresh;
+
+                trigger OnAction()
+                begin
+                    LoadInformation();
+                    CurrPage.Update(false);
+                end;
+            }
+
+            action(ShowEnvironmentInfo)
+            {
+                ApplicationArea = All;
+                Caption = 'Environment Info';
+                ToolTip = 'Shows the environment information in a format that can be copied.';
+                Image = View;
+
+                trigger OnAction()
+                begin
+                    ShowEnvironmentInformation();
+                end;
+            }
+        }
+
+        area(Promoted)
+        {
+            actionref(RefreshInformationPromoted; RefreshInformation)
+            {
+            }
+
+            actionref(ShowEnvironmentInfoPromoted; ShowEnvironmentInfo)
+            {
             }
         }
     }
@@ -225,6 +269,8 @@ page 50200 "Environment Inspector"
 
         LoadServerInformation();
         LoadSqlInformation();
+
+        SqlDatabaseName := GetCurrentDatabaseName();
     end;
 
     local procedure GetBaseApplicationVersion(): Text
@@ -236,6 +282,18 @@ page 50200 "Environment Inspector"
 
         if NavApp.GetModuleInfo(BaseApplicationId, BaseApplicationInfo) then
             exit(Format(BaseApplicationInfo.AppVersion()));
+
+        exit('Unknown');
+    end;
+
+    local procedure GetCurrentDatabaseName(): Text
+    var
+        ActiveSession: Record "Active Session";
+    begin
+        ActiveSession.SetRange("Session ID", SessionId());
+
+        if ActiveSession.FindFirst() then
+            exit(ActiveSession."Database Name");
 
         exit('Unknown');
     end;
@@ -409,8 +467,7 @@ page 50200 "Environment Inspector"
             'CAST(SERVERPROPERTY(''ServerName'') AS nvarchar(250)), ' +
             'CAST(SERVERPROPERTY(''InstanceName'') AS nvarchar(250)), ' +
             'CAST(SERVERPROPERTY(''ProductVersion'') AS nvarchar(100)), ' +
-            'CAST(SERVERPROPERTY(''Edition'') AS nvarchar(250)), ' +
-            'DB_NAME();';
+            'CAST(SERVERPROPERTY(''Edition'') AS nvarchar(250));';
 
         SqlCommand := SqlConnection.CreateCommand();
         SqlCommand.CommandText := QueryText;
@@ -422,7 +479,6 @@ page 50200 "Environment Inspector"
             SqlInstanceName := GetSqlString(SqlReader, 1);
             SqlProductVersion := GetSqlString(SqlReader, 2);
             SqlEdition := GetSqlString(SqlReader, 3);
-            SqlDatabaseName := GetSqlString(SqlReader, 4);
 
             SqlProductName :=
                 GetSqlProductName(
@@ -503,6 +559,124 @@ page 50200 "Environment Inspector"
         Clear(SqlProductName);
         Clear(SqlProductVersion);
         Clear(SqlEdition);
-        Clear(SqlDatabaseName);
+    end;
+
+    local procedure ShowEnvironmentInformation()
+    var
+        EnvironmentText: Text;
+    begin
+        EnvironmentText := BuildEnvironmentInformation();
+
+        Message(EnvironmentText);
+    end;
+
+    local procedure BuildEnvironmentInformation(): Text
+    var
+        EnvironmentText: TextBuilder;
+    begin
+        EnvironmentText.AppendLine(
+            '=== Business Central Environment ===');
+
+        EnvironmentText.AppendLine('');
+
+        EnvironmentText.AppendLine(
+            'Business Central');
+
+        EnvironmentText.AppendLine(
+            'Application Version: ' +
+            ApplicationVersion);
+
+        EnvironmentText.AppendLine(
+            'Environment Name: ' +
+            EnvironmentName);
+
+        EnvironmentText.AppendLine(
+            'Deployment Type: ' +
+            DeploymentType);
+
+        EnvironmentText.AppendLine(
+            'Environment Type: ' +
+            EnvironmentType);
+
+        EnvironmentText.AppendLine(
+            'Application Family: ' +
+            ApplicationFamily);
+
+        EnvironmentText.AppendLine(
+            'Company: ' +
+            CurrentCompany);
+
+        EnvironmentText.AppendLine('');
+
+        EnvironmentText.AppendLine(
+            'Business Central Service Tier');
+
+        EnvironmentText.AppendLine(
+            'Server Name: ' +
+            ServerName);
+
+        EnvironmentText.AppendLine(
+            'Operating System: ' +
+            OSVersion);
+
+        EnvironmentText.AppendLine(
+            'CPU: ' +
+            CPUModel);
+
+        EnvironmentText.AppendLine(
+            'Logical Processors: ' +
+            Format(ProcessorCount));
+
+        EnvironmentText.AppendLine(
+            'Total RAM: ' +
+            TotalRAM);
+
+        EnvironmentText.AppendLine(
+            '64-bit OS: ' +
+            FormatBoolean(Is64BitOS));
+
+        EnvironmentText.AppendLine(
+            '64-bit BC Process: ' +
+            FormatBoolean(Is64BitProcess));
+
+        EnvironmentText.AppendLine('');
+
+        EnvironmentText.AppendLine(
+            'SQL Server');
+
+        EnvironmentText.AppendLine(
+            'Server Name: ' +
+            SqlServerName);
+
+        if SqlInstanceName <> '' then
+            EnvironmentText.AppendLine(
+                'Instance: ' +
+                SqlInstanceName);
+
+        EnvironmentText.AppendLine(
+            'SQL Version: ' +
+            SqlProductName);
+
+        EnvironmentText.AppendLine(
+            'Product Version: ' +
+            SqlProductVersion);
+
+        EnvironmentText.AppendLine(
+            'Edition: ' +
+            SqlEdition);
+
+        EnvironmentText.AppendLine(
+            'Database: ' +
+            SqlDatabaseName);
+
+        exit(EnvironmentText.ToText());
+    end;
+
+    local procedure FormatBoolean(Value: Boolean): Text
+    begin
+        if Value then
+            exit('Yes');
+
+        exit('No');
     end;
 }
