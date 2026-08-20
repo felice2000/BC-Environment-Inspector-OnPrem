@@ -185,36 +185,28 @@ page 50200 "Environment Inspector"
 
     local procedure GetWindowsVersion(): Text
     var
-        BaseKey: DotNet DotNetRegistryKey;
+        Registry: DotNet DotNetRegistry;
         RegistryKey: DotNet DotNetRegistryKey;
-        RegistryHive: DotNet DotNetRegistryHive;
-        RegistryView: DotNet DotNetRegistryView;
         ProductName: Text[250];
         DisplayVersion: Text[50];
         CurrentBuild: Text[50];
         CurrentBuildNo: Integer;
     begin
-        BaseKey := BaseKey.OpenBaseKey(
-            RegistryHive.LocalMachine,
-            RegistryView.Registry64);
+        RegistryKey :=
+            Registry.LocalMachine.OpenSubKey(
+                'SOFTWARE\Microsoft\Windows NT\CurrentVersion');
 
-        RegistryKey := BaseKey.OpenSubKey(
-            'SOFTWARE\Microsoft\Windows NT\CurrentVersion');
-
-        if IsNull(RegistryKey) then begin
-            BaseKey.Close();
+        if IsNull(RegistryKey) then
             exit('Unknown');
-        end;
 
         ProductName := Format(RegistryKey.GetValue('ProductName'));
         DisplayVersion := Format(RegistryKey.GetValue('DisplayVersion'));
         CurrentBuild := Format(RegistryKey.GetValue('CurrentBuild'));
 
         RegistryKey.Close();
-        BaseKey.Close();
 
-        // Windows 11 can still expose "Windows 10"
-        // through ProductName for compatibility.
+        // Windows 11 may still report "Windows 10"
+        // in ProductName for compatibility reasons.
         if Evaluate(CurrentBuildNo, CurrentBuild) then
             if CurrentBuildNo >= 22000 then
                 ProductName :=
