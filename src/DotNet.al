@@ -17,6 +17,14 @@ dotnet
         type(Microsoft.Win32.RegistryView; DotNetRegistryView)
         {
         }
+
+        type(System.IO.File; DotNetFile)
+        {
+        }
+
+        type(System.IO.Path; DotNetPath)
+        {
+        }
     }
 
     assembly(System.Management)

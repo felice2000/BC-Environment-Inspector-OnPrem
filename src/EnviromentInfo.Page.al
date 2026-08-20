@@ -188,7 +188,7 @@ page 90200 "Environment Inspector"
             {
                 ApplicationArea = All;
                 Caption = 'Environment Info';
-                ToolTip = 'Shows the environment information in a format that can be copied.';
+                ToolTip = 'Shows a formatted summary of the current environment.';
                 Image = View;
 
                 trigger OnAction()
@@ -239,14 +239,20 @@ page 90200 "Environment Inspector"
         SqlEdition: Text[250];
         SqlDatabaseName: Text[250];
 
+        ConfiguredDatabaseServer: Text[250];
+        ConfiguredDatabaseInstance: Text[250];
+
     local procedure LoadInformation()
     var
         EnvironmentInformation: Codeunit "Environment Information";
     begin
         ApplicationVersion := GetBaseApplicationVersion();
 
-        EnvironmentName := EnvironmentInformation.GetEnvironmentName();
-        ApplicationFamily := EnvironmentInformation.GetApplicationFamily();
+        EnvironmentName :=
+            EnvironmentInformation.GetEnvironmentName();
+
+        ApplicationFamily :=
+            EnvironmentInformation.GetApplicationFamily();
 
         if EnvironmentInformation.IsOnPrem() then
             DeploymentType := 'On-Premises'
@@ -267,10 +273,10 @@ page 90200 "Environment Inspector"
         CurrentCompany := CompanyName();
         CurrentUser := UserId();
 
+        SqlDatabaseName := GetCurrentDatabaseName();
+
         LoadServerInformation();
         LoadSqlInformation();
-
-        SqlDatabaseName := GetCurrentDatabaseName();
     end;
 
     local procedure GetBaseApplicationVersion(): Text
@@ -278,10 +284,16 @@ page 90200 "Environment Inspector"
         BaseApplicationInfo: ModuleInfo;
         BaseApplicationId: Guid;
     begin
-        BaseApplicationId := '437dbf0e-84ff-417a-965d-ed2bb9650972';
+        BaseApplicationId :=
+            '437dbf0e-84ff-417a-965d-ed2bb9650972';
 
-        if NavApp.GetModuleInfo(BaseApplicationId, BaseApplicationInfo) then
-            exit(Format(BaseApplicationInfo.AppVersion()));
+        if NavApp.GetModuleInfo(
+            BaseApplicationId,
+            BaseApplicationInfo)
+        then
+            exit(
+                Format(
+                    BaseApplicationInfo.AppVersion()));
 
         exit('Unknown');
     end;
@@ -290,25 +302,56 @@ page 90200 "Environment Inspector"
     var
         ActiveSession: Record "Active Session";
     begin
-        ActiveSession.SetRange("Session ID", SessionId());
+        ActiveSession.SetRange(
+            "Session ID",
+            SessionId());
 
         if ActiveSession.FindFirst() then
-            exit(ActiveSession."Database Name");
+            exit(
+                ActiveSession."Database Name");
 
         exit('Unknown');
+    end;
+
+    local procedure GetCurrentServerInstanceName(): Text
+    var
+        ActiveSession: Record "Active Session";
+    begin
+        ActiveSession.SetRange(
+            "Session ID",
+            SessionId());
+
+        if ActiveSession.FindFirst() then
+            exit(
+                ActiveSession."Server Instance Name");
+
+        exit('');
     end;
 
     local procedure LoadServerInformation()
     var
         Environment: DotNet DotNetEnvironment;
     begin
-        ServerName := Environment.MachineName;
-        OSVersion := GetWindowsVersion();
-        CPUModel := GetCPUModel();
-        ProcessorCount := Environment.ProcessorCount;
-        TotalRAM := GetTotalRAM();
-        Is64BitOS := Environment.Is64BitOperatingSystem;
-        Is64BitProcess := Environment.Is64BitProcess;
+        ServerName :=
+            Environment.MachineName;
+
+        OSVersion :=
+            GetWindowsVersion();
+
+        CPUModel :=
+            GetCPUModel();
+
+        ProcessorCount :=
+            Environment.ProcessorCount;
+
+        TotalRAM :=
+            GetTotalRAM();
+
+        Is64BitOS :=
+            Environment.Is64BitOperatingSystem;
+
+        Is64BitProcess :=
+            Environment.Is64BitProcess;
     end;
 
     local procedure GetWindowsVersion(): Text
@@ -322,26 +365,42 @@ page 90200 "Environment Inspector"
         CurrentBuild: Text[50];
         CurrentBuildNo: Integer;
     begin
-        BaseKey := BaseKey.OpenBaseKey(
-            RegistryHive.LocalMachine,
-            RegistryView.Registry64);
+        BaseKey :=
+            BaseKey.OpenBaseKey(
+                RegistryHive.LocalMachine,
+                RegistryView.Registry64);
 
-        RegistryKey := BaseKey.OpenSubKey(
-            'SOFTWARE\Microsoft\Windows NT\CurrentVersion');
+        RegistryKey :=
+            BaseKey.OpenSubKey(
+                'SOFTWARE\Microsoft\Windows NT\CurrentVersion');
 
         if IsNull(RegistryKey) then begin
             BaseKey.Close();
             exit('Unknown');
         end;
 
-        ProductName := Format(RegistryKey.GetValue('ProductName'));
-        DisplayVersion := Format(RegistryKey.GetValue('DisplayVersion'));
-        CurrentBuild := Format(RegistryKey.GetValue('CurrentBuild'));
+        ProductName :=
+            Format(
+                RegistryKey.GetValue(
+                    'ProductName'));
+
+        DisplayVersion :=
+            Format(
+                RegistryKey.GetValue(
+                    'DisplayVersion'));
+
+        CurrentBuild :=
+            Format(
+                RegistryKey.GetValue(
+                    'CurrentBuild'));
 
         RegistryKey.Close();
         BaseKey.Close();
 
-        if Evaluate(CurrentBuildNo, CurrentBuild) then
+        if Evaluate(
+            CurrentBuildNo,
+            CurrentBuild)
+        then
             if CurrentBuildNo >= 22000 then
                 ProductName :=
                     ProductName.Replace(
@@ -354,7 +413,10 @@ page 90200 "Environment Inspector"
                 '');
 
         if DisplayVersion <> '' then
-            exit(ProductName + ' ' + DisplayVersion);
+            exit(
+                ProductName +
+                ' ' +
+                DisplayVersion);
 
         exit(ProductName);
     end;
@@ -370,10 +432,14 @@ page 90200 "Environment Inspector"
             Searcher.ManagementObjectSearcher(
                 'SELECT Name FROM Win32_Processor');
 
-        Collection := Searcher.Get();
+        Collection :=
+            Searcher.Get();
 
         foreach ManagementObject in Collection do begin
-            CPUName := Format(ManagementObject.Item('Name'));
+            CPUName :=
+                Format(
+                    ManagementObject.Item(
+                        'Name'));
 
             Searcher.Dispose();
             Collection.Dispose();
@@ -399,7 +465,8 @@ page 90200 "Environment Inspector"
             Searcher.ManagementObjectSearcher(
                 'SELECT TotalPhysicalMemory FROM Win32_ComputerSystem');
 
-        Collection := Searcher.Get();
+        Collection :=
+            Searcher.Get();
 
         foreach ManagementObject in Collection do begin
             if Evaluate(
@@ -437,7 +504,8 @@ page 90200 "Environment Inspector"
         ClearSqlInformation();
 
         if not TryLoadSqlInformation() then
-            SqlServerName := 'Unable to retrieve SQL information';
+            SqlServerName :=
+                'Unable to retrieve SQL information';
     end;
 
     [TryFunction]
@@ -448,9 +516,24 @@ page 90200 "Environment Inspector"
         SqlReader: DotNet DotNetSqlDataReader;
         ConnectionString: Text;
         QueryText: Text;
+        SqlDataSource: Text;
     begin
+        LoadDatabaseConfiguration();
+
+        if ConfiguredDatabaseServer = '' then
+            Error(
+                'Unable to determine the SQL Server configured for this Business Central Server instance.');
+
+        SqlDataSource :=
+            BuildSqlDataSource();
+
         ConnectionString :=
-            'Server=localhost;' +
+            'Server=' +
+            SqlDataSource +
+            ';' +
+            'Database=' +
+            SqlDatabaseName +
+            ';' +
             'Integrated Security=True;' +
             'TrustServerCertificate=True;';
 
@@ -469,16 +552,35 @@ page 90200 "Environment Inspector"
             'CAST(SERVERPROPERTY(''ProductVersion'') AS nvarchar(100)), ' +
             'CAST(SERVERPROPERTY(''Edition'') AS nvarchar(250));';
 
-        SqlCommand := SqlConnection.CreateCommand();
-        SqlCommand.CommandText := QueryText;
+        SqlCommand :=
+            SqlConnection.CreateCommand();
 
-        SqlReader := SqlCommand.ExecuteReader();
+        SqlCommand.CommandText :=
+            QueryText;
+
+        SqlReader :=
+            SqlCommand.ExecuteReader();
 
         if SqlReader.Read() then begin
-            SqlServerName := GetSqlString(SqlReader, 0);
-            SqlInstanceName := GetSqlString(SqlReader, 1);
-            SqlProductVersion := GetSqlString(SqlReader, 2);
-            SqlEdition := GetSqlString(SqlReader, 3);
+            SqlServerName :=
+                GetSqlString(
+                    SqlReader,
+                    0);
+
+            SqlInstanceName :=
+                GetSqlString(
+                    SqlReader,
+                    1);
+
+            SqlProductVersion :=
+                GetSqlString(
+                    SqlReader,
+                    2);
+
+            SqlEdition :=
+                GetSqlString(
+                    SqlReader,
+                    3);
 
             SqlProductName :=
                 GetSqlProductName(
@@ -489,11 +591,246 @@ page 90200 "Environment Inspector"
         SqlConnection.Close();
     end;
 
+    local procedure BuildSqlDataSource(): Text
+    var
+        DataSource: Text;
+    begin
+        DataSource :=
+            ConfiguredDatabaseServer;
+
+        if ConfiguredDatabaseInstance <> '' then
+            if StrPos(
+                ConfiguredDatabaseServer,
+                '\') = 0
+            then
+                DataSource :=
+                    DataSource +
+                    '\' +
+                    ConfiguredDatabaseInstance;
+
+        exit(DataSource);
+    end;
+
+    local procedure LoadDatabaseConfiguration()
+    var
+        DotNetFile: DotNet DotNetFile;
+        ConfigPath: Text;
+        ConfigContent: Text;
+        ConfigDocument: XmlDocument;
+    begin
+        Clear(ConfiguredDatabaseServer);
+        Clear(ConfiguredDatabaseInstance);
+
+        ConfigPath :=
+            GetCustomSettingsPath();
+
+        if ConfigPath = '' then
+            Error(
+                'Unable to locate CustomSettings.config for the current Business Central Server instance.');
+
+        ConfigContent :=
+            DotNetFile.ReadAllText(
+                ConfigPath);
+
+        if not XmlDocument.ReadFrom(
+            ConfigContent,
+            ConfigDocument)
+        then
+            Error(
+                'Unable to parse CustomSettings.config.');
+
+        ConfiguredDatabaseServer :=
+            GetServerConfigValue(
+                ConfigDocument,
+                'DatabaseServer');
+
+        ConfiguredDatabaseInstance :=
+            GetServerConfigValue(
+                ConfigDocument,
+                'DatabaseInstance');
+    end;
+
+    local procedure GetCustomSettingsPath(): Text
+    var
+        Searcher: DotNet DotNetManagementObjectSearcher;
+        Collection: DotNet DotNetManagementObjectCollection;
+        ManagementObject: DotNet DotNetManagementObject;
+        DotNetFile: DotNet DotNetFile;
+        DotNetPath: DotNet DotNetPath;
+        ServerInstanceName: Text;
+        WindowsServiceName: Text;
+        ServicePath: Text;
+        ExecutablePath: Text;
+        ServiceDirectory: Text;
+        ConfigPath: Text;
+    begin
+        ServerInstanceName :=
+            GetCurrentServerInstanceName();
+
+        if ServerInstanceName = '' then
+            exit('');
+
+        if StrPos(
+            ServerInstanceName,
+            'MicrosoftDynamicsNavServer$') = 1
+        then
+            WindowsServiceName :=
+                ServerInstanceName
+        else
+            WindowsServiceName :=
+                'MicrosoftDynamicsNavServer$' +
+                ServerInstanceName;
+
+        Searcher :=
+            Searcher.ManagementObjectSearcher(
+                'SELECT PathName FROM Win32_Service WHERE Name = ''' +
+                WindowsServiceName +
+                '''');
+
+        Collection :=
+            Searcher.Get();
+
+        foreach ManagementObject in Collection do begin
+            ServicePath :=
+                Format(
+                    ManagementObject.Item(
+                        'PathName'));
+
+            ExecutablePath :=
+                ExtractExecutablePath(
+                    ServicePath);
+
+            Searcher.Dispose();
+            Collection.Dispose();
+
+            if ExecutablePath = '' then
+                exit('');
+
+            ServiceDirectory :=
+                DotNetPath.GetDirectoryName(
+                    ExecutablePath);
+
+            ConfigPath :=
+                DotNetPath.Combine(
+                    ServiceDirectory,
+                    'Instances\' +
+                    ServerInstanceName +
+                    '\CustomSettings.config');
+
+            if DotNetFile.Exists(
+                ConfigPath)
+            then
+                exit(ConfigPath);
+
+            ConfigPath :=
+                DotNetPath.Combine(
+                    ServiceDirectory,
+                    'CustomSettings.config');
+
+            if DotNetFile.Exists(
+                ConfigPath)
+            then
+                exit(ConfigPath);
+
+            exit('');
+        end;
+
+        Searcher.Dispose();
+        Collection.Dispose();
+
+        exit('');
+    end;
+
+    local procedure ExtractExecutablePath(ServicePath: Text): Text
+    var
+        RemainingText: Text;
+        ClosingQuotePosition: Integer;
+        SpacePosition: Integer;
+    begin
+        ServicePath :=
+            ServicePath.Trim();
+
+        if ServicePath = '' then
+            exit('');
+
+        if CopyStr(
+            ServicePath,
+            1,
+            1) = '"'
+        then begin
+            RemainingText :=
+                CopyStr(
+                    ServicePath,
+                    2);
+
+            ClosingQuotePosition :=
+                StrPos(
+                    RemainingText,
+                    '"');
+
+            if ClosingQuotePosition > 0 then
+                exit(
+                    CopyStr(
+                        RemainingText,
+                        1,
+                        ClosingQuotePosition - 1));
+        end;
+
+        SpacePosition :=
+            StrPos(
+                ServicePath,
+                ' ');
+
+        if SpacePosition > 0 then
+            exit(
+                CopyStr(
+                    ServicePath,
+                    1,
+                    SpacePosition - 1));
+
+        exit(ServicePath);
+    end;
+
+    local procedure GetServerConfigValue(
+        ConfigDocument: XmlDocument;
+        KeyName: Text): Text
+    var
+        ConfigNode: XmlNode;
+        ConfigElement: XmlElement;
+        ValueAttribute: XmlAttribute;
+        XPath: Text;
+    begin
+        XPath :=
+            StrSubstNo(
+                '//appSettings/add[@key=''%1'']',
+                KeyName);
+
+        if not ConfigDocument.SelectSingleNode(
+            XPath,
+            ConfigNode)
+        then
+            exit('');
+
+        ConfigElement :=
+            ConfigNode.AsXmlElement();
+
+        if not ConfigElement.Attributes().Get(
+            'value',
+            ValueAttribute)
+        then
+            exit('');
+
+        exit(
+            ValueAttribute.Value());
+    end;
+
     local procedure GetSqlString(
         SqlReader: DotNet DotNetSqlDataReader;
         ColumnIndex: Integer): Text
     begin
-        if SqlReader.IsDBNull(ColumnIndex) then
+        if SqlReader.IsDBNull(
+            ColumnIndex)
+        then
             exit('');
 
         exit(
@@ -502,7 +839,8 @@ page 90200 "Environment Inspector"
                     ColumnIndex)));
     end;
 
-    local procedure GetSqlProductName(ProductVersion: Text): Text
+    local procedure GetSqlProductName(
+        ProductVersion: Text): Text
     var
         DotPosition: Integer;
         MajorVersionText: Text[10];
@@ -511,7 +849,10 @@ page 90200 "Environment Inspector"
         if ProductVersion = '' then
             exit('Unknown');
 
-        DotPosition := StrPos(ProductVersion, '.');
+        DotPosition :=
+            StrPos(
+                ProductVersion,
+                '.');
 
         if DotPosition = 0 then
             exit('Unknown');
@@ -531,24 +872,33 @@ page 90200 "Environment Inspector"
         case MajorVersion of
             17:
                 exit('SQL Server 2025');
+
             16:
                 exit('SQL Server 2022');
+
             15:
                 exit('SQL Server 2019');
+
             14:
                 exit('SQL Server 2017');
+
             13:
                 exit('SQL Server 2016');
+
             12:
                 exit('SQL Server 2014');
+
             11:
                 exit('SQL Server 2012');
+
             10:
                 exit('SQL Server 2008 / 2008 R2');
+
             else
                 exit(
                     'SQL Server - Major Version ' +
-                    Format(MajorVersion));
+                    Format(
+                        MajorVersion));
         end;
     end;
 
@@ -559,13 +909,16 @@ page 90200 "Environment Inspector"
         Clear(SqlProductName);
         Clear(SqlProductVersion);
         Clear(SqlEdition);
+        Clear(ConfiguredDatabaseServer);
+        Clear(ConfiguredDatabaseInstance);
     end;
 
     local procedure ShowEnvironmentInformation()
     var
         EnvironmentText: Text;
     begin
-        EnvironmentText := BuildEnvironmentInformation();
+        EnvironmentText :=
+            BuildEnvironmentInformation();
 
         Message(EnvironmentText);
     end;
@@ -625,7 +978,8 @@ page 90200 "Environment Inspector"
 
         EnvironmentText.AppendLine(
             'Logical Processors: ' +
-            Format(ProcessorCount));
+            Format(
+                ProcessorCount));
 
         EnvironmentText.AppendLine(
             'Total RAM: ' +
@@ -633,11 +987,13 @@ page 90200 "Environment Inspector"
 
         EnvironmentText.AppendLine(
             '64-bit OS: ' +
-            FormatBoolean(Is64BitOS));
+            FormatBoolean(
+                Is64BitOS));
 
         EnvironmentText.AppendLine(
             '64-bit BC Process: ' +
-            FormatBoolean(Is64BitProcess));
+            FormatBoolean(
+                Is64BitProcess));
 
         EnvironmentText.AppendLine('');
 
@@ -669,10 +1025,12 @@ page 90200 "Environment Inspector"
             'Database: ' +
             SqlDatabaseName);
 
-        exit(EnvironmentText.ToText());
+        exit(
+            EnvironmentText.ToText());
     end;
 
-    local procedure FormatBoolean(Value: Boolean): Text
+    local procedure FormatBoolean(
+        Value: Boolean): Text
     begin
         if Value then
             exit('Yes');
