@@ -75,6 +75,20 @@ page 50200 "Environment Inspector"
                     Editable = false;
                 }
 
+                field(OSVersion; OSVersion)
+                {
+                    ApplicationArea = All;
+                    Caption = 'Operating System';
+                    Editable = false;
+                }
+
+                field(CPUModel; CPUModel)
+                {
+                    ApplicationArea = All;
+                    Caption = 'CPU';
+                    Editable = false;
+                }
+
                 field(ProcessorCount; ProcessorCount)
                 {
                     ApplicationArea = All;
@@ -82,10 +96,10 @@ page 50200 "Environment Inspector"
                     Editable = false;
                 }
 
-                field(OSVersion; OSVersion)
+                field(TotalRAM; TotalRAM)
                 {
                     ApplicationArea = All;
-                    Caption = 'Operating System';
+                    Caption = 'Total RAM';
                     Editable = false;
                 }
 
@@ -121,8 +135,10 @@ page 50200 "Environment Inspector"
         CurrentUser: Text[250];
 
         ServerName: Text[250];
-        ProcessorCount: Integer;
         OSVersion: Text[250];
+        CPUModel: Text[250];
+        ProcessorCount: Integer;
+        TotalRAM: Text[50];
         Is64BitOS: Boolean;
         Is64BitProcess: Boolean;
 
@@ -175,10 +191,10 @@ page 50200 "Environment Inspector"
         Environment: DotNet DotNetEnvironment;
     begin
         ServerName := Environment.MachineName;
-        ProcessorCount := Environment.ProcessorCount;
-
         OSVersion := GetWindowsVersion();
-
+        CPUModel := GetCPUModel();
+        ProcessorCount := Environment.ProcessorCount;
+        TotalRAM := GetTotalRAM();
         Is64BitOS := Environment.Is64BitOperatingSystem;
         Is64BitProcess := Environment.Is64BitProcess;
     end;
@@ -213,8 +229,6 @@ page 50200 "Environment Inspector"
         RegistryKey.Close();
         BaseKey.Close();
 
-        // Windows 11 can still expose "Windows 10"
-        // through ProductName for compatibility.
         if Evaluate(CurrentBuildNo, CurrentBuild) then
             if CurrentBuildNo >= 22000 then
                 ProductName :=
@@ -231,5 +245,74 @@ page 50200 "Environment Inspector"
             exit(ProductName + ' ' + DisplayVersion);
 
         exit(ProductName);
+    end;
+
+    local procedure GetCPUModel(): Text
+    var
+        Searcher: DotNet DotNetManagementObjectSearcher;
+        Collection: DotNet DotNetManagementObjectCollection;
+        ManagementObject: DotNet DotNetManagementObject;
+        CPUName: Text[250];
+    begin
+        Searcher := Searcher.ManagementObjectSearcher(
+            'SELECT Name FROM Win32_Processor');
+
+        Collection := Searcher.Get();
+
+        foreach ManagementObject in Collection do begin
+            CPUName := Format(ManagementObject.Item('Name'));
+
+            Searcher.Dispose();
+            Collection.Dispose();
+
+            exit(CPUName);
+        end;
+
+        Searcher.Dispose();
+        Collection.Dispose();
+
+        exit('Unknown');
+    end;
+
+    local procedure GetTotalRAM(): Text
+    var
+        Searcher: DotNet DotNetManagementObjectSearcher;
+        Collection: DotNet DotNetManagementObjectCollection;
+        ManagementObject: DotNet DotNetManagementObject;
+        TotalMemoryBytes: Decimal;
+        TotalMemoryGB: Decimal;
+    begin
+        Searcher := Searcher.ManagementObjectSearcher(
+            'SELECT TotalPhysicalMemory FROM Win32_ComputerSystem');
+
+        Collection := Searcher.Get();
+
+        foreach ManagementObject in Collection do begin
+            if Evaluate(
+                TotalMemoryBytes,
+                Format(ManagementObject.Item('TotalPhysicalMemory')))
+            then begin
+                TotalMemoryGB :=
+                    TotalMemoryBytes /
+                    1024 /
+                    1024 /
+                    1024;
+
+                Searcher.Dispose();
+                Collection.Dispose();
+
+                exit(
+                    Format(
+                        Round(
+                            TotalMemoryGB,
+                            0.1)) +
+                    ' GB');
+            end;
+        end;
+
+        Searcher.Dispose();
+        Collection.Dispose();
+
+        exit('Unknown');
     end;
 }
