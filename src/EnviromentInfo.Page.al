@@ -18,7 +18,6 @@ page 50200 "Environment Inspector"
                     ApplicationArea = All;
                     Caption = 'Application Version';
                     Editable = false;
-                    ToolTip = 'Specifies the installed version of the Microsoft Base Application.';
                 }
 
                 field(EnvironmentName; EnvironmentName)
@@ -117,6 +116,53 @@ page 50200 "Environment Inspector"
                     Editable = false;
                 }
             }
+
+            group(SqlServer)
+            {
+                Caption = 'SQL Server';
+
+                field(SqlServerName; SqlServerName)
+                {
+                    ApplicationArea = All;
+                    Caption = 'Server Name';
+                    Editable = false;
+                }
+
+                field(SqlInstanceName; SqlInstanceName)
+                {
+                    ApplicationArea = All;
+                    Caption = 'Instance';
+                    Editable = false;
+                }
+
+                field(SqlProductName; SqlProductName)
+                {
+                    ApplicationArea = All;
+                    Caption = 'SQL Version';
+                    Editable = false;
+                }
+
+                field(SqlProductVersion; SqlProductVersion)
+                {
+                    ApplicationArea = All;
+                    Caption = 'Product Version';
+                    Editable = false;
+                }
+
+                field(SqlEdition; SqlEdition)
+                {
+                    ApplicationArea = All;
+                    Caption = 'Edition';
+                    Editable = false;
+                }
+
+                field(SqlDatabaseName; SqlDatabaseName)
+                {
+                    ApplicationArea = All;
+                    Caption = 'Connected Database';
+                    Editable = false;
+                }
+            }
         }
     }
 
@@ -141,6 +187,13 @@ page 50200 "Environment Inspector"
         TotalRAM: Text[50];
         Is64BitOS: Boolean;
         Is64BitProcess: Boolean;
+
+        SqlServerName: Text[250];
+        SqlInstanceName: Text[250];
+        SqlProductName: Text[100];
+        SqlProductVersion: Text[100];
+        SqlEdition: Text[250];
+        SqlDatabaseName: Text[250];
 
     local procedure LoadInformation()
     var
@@ -171,6 +224,7 @@ page 50200 "Environment Inspector"
         CurrentUser := UserId();
 
         LoadServerInformation();
+        LoadSqlInformation();
     end;
 
     local procedure GetBaseApplicationVersion(): Text
@@ -254,8 +308,9 @@ page 50200 "Environment Inspector"
         ManagementObject: DotNet DotNetManagementObject;
         CPUName: Text[250];
     begin
-        Searcher := Searcher.ManagementObjectSearcher(
-            'SELECT Name FROM Win32_Processor');
+        Searcher :=
+            Searcher.ManagementObjectSearcher(
+                'SELECT Name FROM Win32_Processor');
 
         Collection := Searcher.Get();
 
@@ -282,15 +337,18 @@ page 50200 "Environment Inspector"
         TotalMemoryBytes: Decimal;
         TotalMemoryGB: Decimal;
     begin
-        Searcher := Searcher.ManagementObjectSearcher(
-            'SELECT TotalPhysicalMemory FROM Win32_ComputerSystem');
+        Searcher :=
+            Searcher.ManagementObjectSearcher(
+                'SELECT TotalPhysicalMemory FROM Win32_ComputerSystem');
 
         Collection := Searcher.Get();
 
         foreach ManagementObject in Collection do begin
             if Evaluate(
                 TotalMemoryBytes,
-                Format(ManagementObject.Item('TotalPhysicalMemory')))
+                Format(
+                    ManagementObject.Item(
+                        'TotalPhysicalMemory')))
             then begin
                 TotalMemoryGB :=
                     TotalMemoryBytes /
@@ -314,5 +372,137 @@ page 50200 "Environment Inspector"
         Collection.Dispose();
 
         exit('Unknown');
+    end;
+
+    local procedure LoadSqlInformation()
+    begin
+        ClearSqlInformation();
+
+        if not TryLoadSqlInformation() then
+            SqlServerName := 'Unable to retrieve SQL information';
+    end;
+
+    [TryFunction]
+    local procedure TryLoadSqlInformation()
+    var
+        SqlConnection: DotNet DotNetSqlConnection;
+        SqlCommand: DotNet DotNetSqlCommand;
+        SqlReader: DotNet DotNetSqlDataReader;
+        ConnectionString: Text;
+        QueryText: Text;
+    begin
+        ConnectionString :=
+            'Server=localhost;' +
+            'Integrated Security=True;' +
+            'TrustServerCertificate=True;';
+
+        SqlConnection :=
+            SqlConnection.SqlConnection();
+
+        SqlConnection.ConnectionString :=
+            ConnectionString;
+
+        SqlConnection.Open();
+
+        QueryText :=
+            'SELECT ' +
+            'CAST(SERVERPROPERTY(''ServerName'') AS nvarchar(250)), ' +
+            'CAST(SERVERPROPERTY(''InstanceName'') AS nvarchar(250)), ' +
+            'CAST(SERVERPROPERTY(''ProductVersion'') AS nvarchar(100)), ' +
+            'CAST(SERVERPROPERTY(''Edition'') AS nvarchar(250)), ' +
+            'DB_NAME();';
+
+        SqlCommand := SqlConnection.CreateCommand();
+        SqlCommand.CommandText := QueryText;
+
+        SqlReader := SqlCommand.ExecuteReader();
+
+        if SqlReader.Read() then begin
+            SqlServerName := GetSqlString(SqlReader, 0);
+            SqlInstanceName := GetSqlString(SqlReader, 1);
+            SqlProductVersion := GetSqlString(SqlReader, 2);
+            SqlEdition := GetSqlString(SqlReader, 3);
+            SqlDatabaseName := GetSqlString(SqlReader, 4);
+
+            SqlProductName :=
+                GetSqlProductName(
+                    SqlProductVersion);
+        end;
+
+        SqlReader.Close();
+        SqlConnection.Close();
+    end;
+
+    local procedure GetSqlString(
+        SqlReader: DotNet DotNetSqlDataReader;
+        ColumnIndex: Integer): Text
+    begin
+        if SqlReader.IsDBNull(ColumnIndex) then
+            exit('');
+
+        exit(
+            Format(
+                SqlReader.GetValue(
+                    ColumnIndex)));
+    end;
+
+    local procedure GetSqlProductName(ProductVersion: Text): Text
+    var
+        DotPosition: Integer;
+        MajorVersionText: Text[10];
+        MajorVersion: Integer;
+    begin
+        if ProductVersion = '' then
+            exit('Unknown');
+
+        DotPosition := StrPos(ProductVersion, '.');
+
+        if DotPosition = 0 then
+            exit('Unknown');
+
+        MajorVersionText :=
+            CopyStr(
+                ProductVersion,
+                1,
+                DotPosition - 1);
+
+        if not Evaluate(
+            MajorVersion,
+            MajorVersionText)
+        then
+            exit('Unknown');
+
+        case MajorVersion of
+            17:
+                exit('SQL Server 2025');
+            16:
+                exit('SQL Server 2022');
+            15:
+                exit('SQL Server 2019');
+            14:
+                exit('SQL Server 2017');
+            13:
+                exit('SQL Server 2016');
+            12:
+                exit('SQL Server 2014');
+            11:
+                exit('SQL Server 2012');
+            10:
+                exit('SQL Server 2008 / 2008 R2');
+            else
+                exit(
+                    'SQL Server - Major Version ' +
+                    Format(MajorVersion));
+        end;
+    end;
+
+    local procedure ClearSqlInformation()
+    begin
+        Clear(SqlServerName);
+        Clear(SqlInstanceName);
+        Clear(SqlProductName);
+        Clear(SqlProductVersion);
+        Clear(SqlEdition);
+        Clear(SqlDatabaseName);
     end;
 }

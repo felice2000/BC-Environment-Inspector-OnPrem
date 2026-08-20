@@ -33,4 +33,19 @@ dotnet
         {
         }
     }
+
+    assembly("Microsoft.Data.SqlClient")
+    {
+        type("Microsoft.Data.SqlClient.SqlConnection"; DotNetSqlConnection)
+        {
+        }
+
+        type("Microsoft.Data.SqlClient.SqlCommand"; DotNetSqlCommand)
+        {
+        }
+
+        type("Microsoft.Data.SqlClient.SqlDataReader"; DotNetSqlDataReader)
+        {
+        }
+    }
 }
