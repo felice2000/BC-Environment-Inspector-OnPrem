@@ -1,0 +1,15 @@
+# AL compiled packages
+*.app
+
+# Downloaded AL symbols
+.alpackages/
+
+# VS Code local configuration
+.vscode/launch.json
+
+# Snapshots / temp
+.snapshots/
+
+# OS
+Thumbs.db
+.DS_Store
