@@ -1,10 +1,10 @@
 # BC Environment Inspector
 
-A lightweight diagnostic extension for Microsoft Dynamics 365 Business Central On-Premises.
+A lightweight diagnostic extension for **Microsoft Dynamics 365 Business Central On-Premises**.
 
-BC Environment Inspector provides a quick overview of the Business Central environment, Service Tier hardware, operating system, and SQL Server information from a single page.
+BC Environment Inspector provides a quick overview of the Business Central environment, Service Tier hardware, operating system, and SQL Server configuration from a single page.
 
-The extension is intended primarily for administrators, consultants, developers, and support engineers working with Business Central On-Premises environments.
+The extension is designed for Business Central administrators, consultants, developers, and support engineers who need to quickly inspect an On-Premises environment.
 
 ## Features
 
@@ -22,10 +22,11 @@ Displays information about the current Business Central environment:
 
 ### Business Central Service Tier
 
-Displays information about the server running the Business Central Service Tier:
+Retrieves information about the machine running the Business Central Service Tier:
 
 - Server Name
-- Operating System and Windows release
+- Operating System
+- Windows Version
 - CPU Model
 - Logical Processors
 - Total Physical Memory
@@ -44,32 +45,72 @@ Total RAM: 64.0 GB
 64-bit BC Process: Yes
 ```
 
+Windows information is retrieved from the local Windows Registry, while CPU and memory information are retrieved through WMI.
+
 ### SQL Server
 
-Displays information about the SQL Server instance:
+Automatically detects the SQL Server configuration used by the current Business Central Server instance.
 
-- Server Name
-- Instance Name
+The extension retrieves:
+
+- SQL Server Name
+- SQL Instance Name
 - SQL Server Version
 - Product Version / Build
-- Edition
-- Business Central Database Name
+- SQL Server Edition
+- Current Business Central Database Name
 
 Example:
 
 ```text
 Server Name: SRV-SQL01
+Instance: BC
 SQL Version: SQL Server 2022
 Product Version: 16.0.x.x
 Edition: Standard Edition (64-bit)
 Database: BC_PROD
 ```
 
-If SQL Server is using the default instance, the Instance field is left empty.
+When SQL Server uses the default instance, the **Instance** field is left empty.
 
-### Environment Report
+## Automatic SQL Server Discovery
 
-The **Environment Info** action generates a formatted summary of the environment that can be used for troubleshooting, documentation, or support tickets.
+BC Environment Inspector does not assume that SQL Server is installed on the same machine as the Business Central Service Tier.
+
+The extension automatically:
+
+1. Detects the current Business Central Server instance.
+2. Locates the Windows service associated with that instance.
+3. Locates the corresponding `CustomSettings.config`.
+4. Reads the configured `DatabaseServer` and `DatabaseInstance`.
+5. Retrieves the current Business Central database name.
+6. Builds the SQL Server connection dynamically.
+7. Connects to the configured SQL Server using Windows Integrated Authentication.
+8. Retrieves SQL Server version, build, instance, and edition information.
+
+This allows the extension to work with environments where:
+
+```text
+Business Central Service Tier
+        |
+        v
+     SRV-BC01
+        |
+        | Windows Integrated Authentication
+        v
+     SRV-SQL01
+        |
+        v
+     BC_PROD
+```
+
+as well as simpler environments where Business Central and SQL Server are installed on the same machine.
+
+No SQL Server address is hardcoded in the extension.
+
+## Environment Summary
+
+The **Environment Info** action generates a formatted summary containing the most useful environment information.
 
 Example:
 
@@ -95,48 +136,74 @@ Total RAM: 64.0 GB
 
 SQL Server
 Server Name: SRV-SQL01
+Instance: BC
 SQL Version: SQL Server 2022
 Product Version: 16.0.x.x
 Edition: Standard Edition (64-bit)
 Database: BC_PROD
 ```
 
+The summary can be useful when collecting environment information for:
+
+- Troubleshooting
+- Support requests
+- Environment documentation
+- Upgrade preparation
+- Infrastructure assessment
+
 ## Requirements
 
 - Microsoft Dynamics 365 Business Central On-Premises
-- `target: OnPrem`
 - Windows-based Business Central Service Tier
+- AL extension target set to `OnPrem`
 - Access to Windows Management Instrumentation (WMI)
 - Access to the Windows Registry
+- Access to the Business Central Server instance configuration
 - SQL Server connectivity from the Business Central Service Tier
 
-The extension uses .NET interoperability and therefore is **not compatible with Business Central SaaS**.
+Because the extension uses .NET interoperability and Windows-specific APIs, it is **not compatible with Business Central SaaS**.
+
+## SQL Server Authentication
+
+SQL Server information is retrieved using **Windows Integrated Authentication**.
+
+The extension does not store or require:
+
+- SQL usernames
+- SQL passwords
+- Connection credentials
+
+The connection is performed using the Windows identity under which the Business Central Server process executes.
+
+The Business Central Service Tier account must therefore have sufficient permissions to connect to the configured Business Central SQL Server and database.
 
 ## .NET Dependencies
 
-The project uses the following .NET assemblies:
+The project uses .NET interoperability for Windows and SQL Server information.
+
+Main dependencies include:
 
 - `mscorlib`
 - `System.Management`
 - `Microsoft.Data.SqlClient`
 
-`Microsoft.Data.SqlClient.dll` is included with the Business Central Server installation.
+`Microsoft.Data.SqlClient.dll` is included with modern Business Central On-Premises Server installations.
 
-For Business Central 28, it can normally be found at:
+For example, with Business Central 28 it can normally be found under:
 
 ```text
-C:\Program Files\Microsoft Dynamics 365 Business Central\280\Service\Microsoft.Data.SqlClient.dll
+C:\Program Files\Microsoft Dynamics 365 Business Central\280\Service\
 ```
 
-For local development, copy the required assembly to:
+For local AL development, the required assembly can be copied to:
 
 ```text
 .netpackages\
 ```
 
-and configure the AL assembly probing paths in `.vscode/settings.json`.
+and referenced through the AL assembly probing paths.
 
-Example:
+Example `.vscode/settings.json`:
 
 ```json
 {
@@ -148,37 +215,34 @@ Example:
 }
 ```
 
-> The `.netpackages` directory should not be committed to the repository.
+> `.netpackages` should not be committed to the repository.
 
-Add it to `.gitignore`:
+Example `.gitignore`:
 
 ```gitignore
 .netpackages/
+.alpackages/
+*.app
+.vscode/launch.json
+.vscode/rad.json
 ```
-
-## SQL Server Authentication
-
-SQL Server information is retrieved using Windows Integrated Authentication.
-
-No SQL Server username or password is stored by the extension.
-
-The Business Central Service Tier account must have sufficient access to connect to SQL Server and retrieve the requested server information.
 
 ## Installation
 
-1. Clone the repository.
+Clone the repository:
 
 ```powershell
 git clone <repository-url>
 ```
 
+Then:
+
+1. Open the project in Visual Studio Code.
 2. Copy the required .NET assemblies to `.netpackages`.
-
 3. Download the Business Central AL symbols.
-
-4. Compile the extension using Visual Studio Code and the AL Language extension.
-
+4. Compile the extension using the AL Language extension.
 5. Publish the generated `.app` package to a Business Central On-Premises environment.
+6. Search for **Environment Inspector** in Business Central.
 
 ## Project Structure
 
@@ -188,41 +252,126 @@ BC-Environment-Inspector-OnPrem/
 │   └── settings.json
 ├── src/
 │   ├── DotNet.al
-│   ├── EnvironmentInfo.Page.al
-│   └── EnvironmentInfoText.Page.al
+│   └── EnvironmentInfo.Page.al
 ├── .gitignore
 ├── app.json
 ├── LICENSE
 └── README.md
 ```
 
+The extension intentionally keeps the implementation small. The environment information, SQL discovery logic, and environment summary are handled from a single Business Central page.
+
+## How SQL Server Is Detected
+
+The extension determines the current Business Central Server instance using the active session information.
+
+It then identifies the corresponding Windows service:
+
+```text
+MicrosoftDynamicsNavServer$<ServerInstance>
+```
+
+The service configuration is used to locate the appropriate `CustomSettings.config`.
+
+The following Business Central Server settings are then read:
+
+```text
+DatabaseServer
+DatabaseInstance
+```
+
+The database name is obtained from the current Business Central session.
+
+The resulting SQL data source is therefore constructed dynamically as either:
+
+```text
+SRV-SQL01
+```
+
+or:
+
+```text
+SRV-SQL01\BC
+```
+
+depending on whether a named SQL Server instance is configured.
+
 ## Security
 
-The extension is designed as a read-only diagnostic tool.
+BC Environment Inspector is designed as a **read-only diagnostic extension**.
 
-It retrieves system and environment information but does not modify:
+It does not modify:
 
-- Business Central configuration
-- Windows configuration
-- SQL Server configuration
 - Business Central data
+- Business Central Server configuration
+- Windows configuration
+- Windows Registry
+- SQL Server configuration
+- SQL Server databases
 
-Because the extension exposes infrastructure information such as server names, hardware details, SQL Server versions, and database names, access to the Environment Inspector page should be restricted to appropriate administrative or technical users.
+The extension only reads environment and configuration information.
+
+However, the information displayed by the extension may include infrastructure details such as:
+
+- Server names
+- Database names
+- SQL Server versions
+- SQL Server editions
+- Hardware specifications
+
+Access to the Environment Inspector page should therefore be restricted to appropriate technical or administrative users.
 
 ## Compatibility
 
-The project is currently developed and tested against Business Central 28 On-Premises.
+The extension is currently developed and tested with:
 
-Other Business Central On-Premises versions may require changes to runtime versions, .NET assembly references, or AL APIs.
+- Microsoft Dynamics 365 Business Central 28 On-Premises
+- Windows-based Business Central Service Tier
+- Microsoft SQL Server
+
+Other Business Central On-Premises versions may work but could require changes to:
+
+- AL runtime version
+- .NET assembly references
+- Business Central APIs
+- SQL client libraries
+
+Testing on additional Business Central versions is welcome.
+
+## Limitations
+
+- Business Central SaaS is not supported.
+- The extension requires .NET interoperability.
+- Windows is required for Service Tier hardware discovery.
+- WMI must be available to retrieve CPU and memory information.
+- SQL Server must be reachable from the Business Central Service Tier.
+- The Business Central Service Tier account must be authorized to connect to SQL Server.
+- Hardware information currently refers to the **Business Central Service Tier machine**, not the remote SQL Server machine.
+
+## Contributing
+
+Contributions, bug reports, and suggestions are welcome.
+
+If you find an issue or would like to propose an improvement, open an issue or submit a pull request.
+
+Possible future improvements include:
+
+- Additional SQL Server information
+- SQL Server host hardware information
+- Database size and configuration information
+- Business Central Server instance information
+- Improved environment report/export functionality
 
 ## Disclaimer
 
-This project is an independent community project and is not affiliated with, endorsed by, or supported by Microsoft.
+This project is an independent community project.
 
-Microsoft Dynamics 365 Business Central, Windows, and SQL Server are trademarks of Microsoft Corporation.
+It is not affiliated with, endorsed by, or supported by Microsoft.
+
+Microsoft Dynamics 365 Business Central, Microsoft SQL Server, and Windows are trademarks of Microsoft Corporation.
 
 ## License
 
-This project is licensed under the MIT License.
+This project is licensed under the **MIT License**.
 
 See the `LICENSE` file for details.
